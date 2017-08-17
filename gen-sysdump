@@ -1,0 +1,124 @@
+#!/bin/bash
+
+if [[ "$1" == "-v" ]] || [[ "$1" == "-d" ]] || [[ "$1" == "" ]]; then
+    path_to_out=""
+else
+    path_to_out="$1"
+fi
+
+echo $path_to_out
+
+dt=($(date '+%d#%m#%Y %H#%M#%S'))
+DATE=${dt[0]}
+TIME=${dt[1]}
+DUMP_FILE="sysdump-$DATE-$TIME.tar"
+SILENT="&>/dev/null"
+DRY_RUN=0
+
+TAR=tar
+
+FILE_DIR=("/proc/net" "/proc/meminfo" "/proc/mounts" "/proc/modules" "/proc/partitions" "/proc/uptime" "/var/log/")
+
+#COMMANDS=('ip route' 'ip link' 'ip -6 route' 'ifconfig' 'mount' 'df' 'sensors')
+
+copy()
+{
+
+    cd archive_folder
+    for item in ${FILE_DIR[*]}
+    do
+        echo $item
+        sudo cp -RL $item .
+    done
+    cd ..
+}
+
+remove()
+{
+    rm -rf archive_folder 
+}
+
+do_command()
+{
+    local command_name=$(echo $1 | tr " " "-")
+    if [[ $DRY_RUN -eq 1 ]]; then
+        echo "$1.out"
+        return 0
+    else
+        $1>"$command_name.out"
+        if [ $? != 0 ]; then
+            echo "Error with $1"
+            return
+        fi
+            eval $TAR -rf $path_to_out"$DUMP_FILE" "$command_name.out" $SILENT
+            rm -rf "$command_name.out"
+    fi
+}
+
+archive()
+{
+    if [[ $DRY_RUN -eq 1 ]]; then
+        for item in ${FILE_DIR[*]}
+        do
+            for filename in $item/*
+            do
+                echo $filename
+            done
+        done
+        return 0
+    else
+        for item in ${FILE_DIR[*]}
+        do
+            sudo cp -RL $item .
+            eval $TAR -rf $path_to_out"$DUMP_FILE" $item $SILENT
+            rm -rf "$(pwd)/$item"
+        done
+    fi
+    do_command "ip route"
+    do_command "ip link"
+    do_command "ip -6 route"
+    do_command "ifconfig"
+    do_command "mount"
+    do_command "df"
+   # do_command "sensors"
+}
+
+#slient_archive_dirs_files()
+#{
+#    local given_path=$1
+#    if [ -d "$given_path" ] || [ -f "$given_path" ]; then
+#        tar -rf $path_to_out"sysdump-<"$DATE">-<"$TIME">.tar" "$given_path" &>/dev/null
+#    else
+###        echo "$given_path does not exits"
+  ##  fi
+#}
+
+#archive_dirs_files()
+#{
+#    local given_path=$1
+ #   if [ -d "$given_path" ] || [ -f "$given_path" ]; then
+#        $TAR -rf $path_to_out"sysdump-<"$DATE">-<"$TIME">.tar" "$given_path"
+#    else
+#        echo "$given_path does not exits"
+#    fi
+#}
+
+while getopts "vd" opt; do
+  case $opt in
+    v)
+        SILENT=""
+	    TAR="tar -v"
+     ;;
+    d)
+        DRY_RUN=1
+        return 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      ;;
+  esac
+done
+
+archive
+echo File saved to "$path_to_out"$DUMP_FILE
+
