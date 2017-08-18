@@ -1,12 +1,10 @@
 #!/bin/bash
 
 if [[ "$1" == "-v" ]] || [[ "$1" == "-d" ]] || [[ "$1" == "" ]]; then
-    path_to_out=""
+    path_to_out="$PWD"
 else
     path_to_out="$1"
 fi
-
-echo $path_to_out
 
 dt=($(date '+%d#%m#%Y %H#%M#%S'))
 DATE=${dt[0]}
@@ -17,32 +15,11 @@ DRY_RUN=0
 
 TAR=tar
 
-FILE_DIR=("/proc/net" "/proc/meminfo" "/proc/mounts" "/proc/modules" "/proc/partitions" "/proc/uptime" "/var/log/")
-
-#COMMANDS=('ip route' 'ip link' 'ip -6 route' 'ifconfig' 'mount' 'df' 'sensors')
-
-copy()
-{
-
-    cd archive_folder
-    for item in ${FILE_DIR[*]}
-    do
-        echo $item
-        sudo cp -RL $item .
-    done
-    cd ..
-}
-
-remove()
-{
-    rm -rf archive_folder 
-}
-
 do_command()
 {
     local command_name=$(echo $1 | tr " " "-")
-    if [[ $DRY_RUN -eq 1 ]]; then
-        echo "$1.out"
+    if [ $DRY_RUN -eq 1 ]; then
+        echo "$command_name.out"
         return 0
     else
         $1>"$command_name.out"
@@ -50,29 +27,40 @@ do_command()
             echo "Error with $1"
             return
         fi
-            eval $TAR -rf $path_to_out"$DUMP_FILE" "$command_name.out" $SILENT
-            rm -rf "$command_name.out"
+        eval $TAR -rhf $path_to_out/$DUMP_FILE -C $PWD "$command_name.out" $SILENT
+        rm -rf "$command_name.out"
     fi
 }
+
+
+archive_item()
+{
+    item=$1
+    mkdir -p $PWD/$(dirname $item)
+    cp -RL --parents /$item $PWD/
+    eval $TAR -rhf $path_to_out/$DUMP_FILE -C $PWD $item $SILENT
+    rm -rf $(echo $item | awk -F "/" '{ print $1}')
+}
+
 
 archive()
 {
     if [[ $DRY_RUN -eq 1 ]]; then
-        for item in ${FILE_DIR[*]}
-        do
-            for filename in $item/*
-            do
-                echo $filename
-            done
-        done
-        return 0
+        echo "/proc/net"
+        echo "/proc/meminfo"
+        echo "/proc/mounts"
+        echo "/proc/modules"
+        echo "/proc/partitions"
+        echo "/proc/uptime"
+        echo "/var/log/"
     else
-        for item in ${FILE_DIR[*]}
-        do
-            sudo cp -RL $item .
-            eval $TAR -rf $path_to_out"$DUMP_FILE" $item $SILENT
-            rm -rf "$(pwd)/$item"
-        done
+        archive_item "proc/net"
+        archive_item "proc/meminfo"
+        archive_item "proc/mounts"
+        archive_item "proc/modules"
+        archive_item "proc/partitions"
+        archive_item "proc/uptime"
+        archive_item "var/log/"
     fi
     do_command "ip route"
     do_command "ip link"
@@ -80,28 +68,9 @@ archive()
     do_command "ifconfig"
     do_command "mount"
     do_command "df"
-   # do_command "sensors"
+    do_command "sensors"
+    do_command "sysctl -a"
 }
-
-#slient_archive_dirs_files()
-#{
-#    local given_path=$1
-#    if [ -d "$given_path" ] || [ -f "$given_path" ]; then
-#        tar -rf $path_to_out"sysdump-<"$DATE">-<"$TIME">.tar" "$given_path" &>/dev/null
-#    else
-###        echo "$given_path does not exits"
-  ##  fi
-#}
-
-#archive_dirs_files()
-#{
-#    local given_path=$1
- #   if [ -d "$given_path" ] || [ -f "$given_path" ]; then
-#        $TAR -rf $path_to_out"sysdump-<"$DATE">-<"$TIME">.tar" "$given_path"
-#    else
-#        echo "$given_path does not exits"
-#    fi
-#}
 
 while getopts "vd" opt; do
   case $opt in
@@ -111,7 +80,6 @@ while getopts "vd" opt; do
      ;;
     d)
         DRY_RUN=1
-        return 0
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -120,5 +88,5 @@ while getopts "vd" opt; do
 done
 
 archive
-echo File saved to "$path_to_out"$DUMP_FILE
+echo File saved to ${path_to_out}${DUMP_FILE}
 
