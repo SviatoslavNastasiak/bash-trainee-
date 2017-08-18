@@ -1,0 +1,95 @@
+#!/bin/bash
+
+IFACE_NAME=""
+
+usage()
+{
+    echo "Use by the following way"
+    echo "./netcrawler -i 1.1.1.1(your ip)"
+
+###########################################
+#          COPY---->PASTE (rewrite)       #
+###########################################
+
+network_address_to_ips() {
+  # define empty array to hold the ip addresses
+  ips=()
+  # create array containing network address and subnet
+  network=(${1//\// })
+  # split network address by dot
+  iparr=(${network[0]//./ })
+  netmaskarr=(${network[1]//./ })
+  # generate list of ip addresses
+  for i in $(seq 0 $((255-${netmaskarr[0]}))); do
+    for j in $(seq 0 $((255-${netmaskarr[1]}))); do
+      for k in $(seq 0 $((255-${netmaskarr[2]}))); do
+        for l in $(seq 1 $((255-${netmaskarr[3]}))); do
+          ips+=( $(( $i+$(( ${iparr[0]}  & ${netmaskarr[0]})) ))"."$(( $j+$(( ${iparr[1]} & ${netmaskarr[1]})) ))"."$(($k+$(( ${iparr[2]} & ${netmaskarr[2]})) ))"."$(($l+$((${iparr[3]} & ${netmaskarr[3]})) )) )
+        done
+      done
+    done
+  done
+}
+
+ping_thread()
+{ 
+    local k=$1
+    while [ $i -lt $el_num ]
+    do
+        ping -I "$ip_addr" -c 1 ${ips[$i]} 2>>log.txt
+        check_ports ${ips[$i]}>>log.txt
+        i=$(($i+$(nproc)))
+    done
+}
+        
+
+start_pinging()
+{
+    if [[ $IFACE_NAME == "" ]];then
+        usage
+        return 0
+    else
+        ip_addr=$(ifconfig | grep -A 4 -P "$IFACE_NAME" | grep "inet addr" | awk '{ print $2 }' | cut -f2 -d":")
+        local net_mask=$(ifconfig | grep -A 4 -P "$IFACE_NAME" | grep Mask | awk '{ print $4 }' | cut -f2 -d":")
+    fi
+    IFS=. read -r i1 i2 i3 i4 <<< "$ip_addr"
+    IFS=. read -r m1 m2 m3 m4 <<< "$net_mask"
+    local subnet_ip=$(printf "%d.%d.%d.%d" "$((i1 & m1))" "$((i2 & m2))" "$((i3 & m3))" "$((i4 & m4))")
+    network_address_to_ips $subnet_ip/$net_mask
+    el_num=${#ips[@]}
+    #local i=$(nproc)
+    touch log.txt
+    for j in $(seq 1 $(nproc))
+    do
+        ping_thread $i &
+    done 
+    return 0
+}
+
+check_ports()
+{
+    local host=$1
+    local tmp=$(nmap $host | grep open | awk '{print $1}' | cut -f1 -d"/")
+    for port in $tmp
+    do
+        if [[ $port -lt 1024 ]]; then
+            echo "Port #$port is open"
+        fi
+    done
+    return 0
+}
+
+
+while getopts "i:" opt; do
+  case $opt in
+    i)
+        IFACE_NAME=$OPTARG
+     ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      ;;
+  esac
+done
+
+start_pinging
+

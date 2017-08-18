@@ -22,7 +22,7 @@ do_command()
         echo "$command_name.out"
         return 0
     else
-        $1>"$command_name.out"
+        $1 > "$command_name.out" 2> /dev/null
         if [ $? != 0 ]; then
             echo "Error with $1"
             return
@@ -36,6 +36,10 @@ do_command()
 archive_item()
 {
     item=$1
+    if [[ $DRY_RUN -eq 1 ]]; then
+	echo /$item
+	return 0
+    fi
     mkdir -p $PWD/$(dirname $item)
     cp -RL --parents /$item $PWD/
     eval $TAR -rhf $path_to_out/$DUMP_FILE -C $PWD $item $SILENT
@@ -45,23 +49,13 @@ archive_item()
 
 archive()
 {
-    if [[ $DRY_RUN -eq 1 ]]; then
-        echo "/proc/net"
-        echo "/proc/meminfo"
-        echo "/proc/mounts"
-        echo "/proc/modules"
-        echo "/proc/partitions"
-        echo "/proc/uptime"
-        echo "/var/log/"
-    else
-        archive_item "proc/net"
-        archive_item "proc/meminfo"
-        archive_item "proc/mounts"
-        archive_item "proc/modules"
-        archive_item "proc/partitions"
-        archive_item "proc/uptime"
-        archive_item "var/log/"
-    fi
+    archive_item "proc/net"
+    archive_item "proc/meminfo"
+    archive_item "proc/mounts"
+    archive_item "proc/modules"
+    archive_item "proc/partitions"
+    archive_item "proc/uptime"
+    archive_item "var/log/"
     do_command "ip route"
     do_command "ip link"
     do_command "ip -6 route"
@@ -88,5 +82,5 @@ while getopts "vd" opt; do
 done
 
 archive
-echo File saved to ${path_to_out}${DUMP_FILE}
+echo File saved to ${path_to_out}/${DUMP_FILE}
 
