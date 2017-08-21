@@ -1,0 +1,6 @@
+PING 172.20.17.253 (172.20.17.253) from 172.20.17.135 : 56(84) bytes of data.
+From 172.20.17.135 icmp_seq=1 Destination Host Unreachable
+
+--- 172.20.17.253 ping statistics ---
+1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+

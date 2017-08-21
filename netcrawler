@@ -5,11 +5,8 @@ IFACE_NAME=""
 usage()
 {
     echo "Use by the following way"
-    echo "./netcrawler -i 1.1.1.1(your ip)"
-
-###########################################
-#          COPY---->PASTE (rewrite)       #
-###########################################
+    echo "./netcrawler -i eth0(your interface name)"
+}
 
 network_address_to_ips() {
   # define empty array to hold the ip addresses
@@ -21,10 +18,10 @@ network_address_to_ips() {
   netmaskarr=(${network[1]//./ })
   # generate list of ip addresses
   for i in $(seq 0 $((255-${netmaskarr[0]}))); do
-    for j in $(seq 0 $((255-${netmaskarr[1]}))); do
-      for k in $(seq 0 $((255-${netmaskarr[2]}))); do
-        for l in $(seq 1 $((255-${netmaskarr[3]}))); do
-          ips+=( $(( $i+$(( ${iparr[0]}  & ${netmaskarr[0]})) ))"."$(( $j+$(( ${iparr[1]} & ${netmaskarr[1]})) ))"."$(($k+$(( ${iparr[2]} & ${netmaskarr[2]})) ))"."$(($l+$((${iparr[3]} & ${netmaskarr[3]})) )) )
+    for ii in $(seq 0 $((255-${netmaskarr[1]}))); do
+      for iii in $(seq 0 $((255-${netmaskarr[2]}))); do
+        for iiii in $(seq 1 $((255-${netmaskarr[3]}))); do
+          ips+=( $(( $i+$(( ${iparr[0]} & ${netmaskarr[0]})) ))"."$(( $ii+$(( ${iparr[1]} & ${netmaskarr[1]})) ))"."$(($iii+$(( ${iparr[2]} & ${netmaskarr[2]})) ))"."$(($iiii+$((${iparr[3]} & ${netmaskarr[3]})) )) )
         done
       done
     done
@@ -33,13 +30,15 @@ network_address_to_ips() {
 
 ping_thread()
 { 
-    local k=$1
-    while [ $i -lt $el_num ]
+    local z=$1
+    
+    while [ $z -lt $el_num ]
     do
-        ping -I "$ip_addr" -c 1 ${ips[$i]} 2>>log.txt
-        check_ports ${ips[$i]}>>log.txt
-        i=$(($i+$(nproc)))
+        ping -I "$ip_addr" -c 1 ${ips[$z]} &>>$1.txt
+        check_ports ${ips[$z]} &>>$1.txt
+        z=$(($z+$(nproc)))
     done
+    return 0
 }
         
 
@@ -57,12 +56,17 @@ start_pinging()
     local subnet_ip=$(printf "%d.%d.%d.%d" "$((i1 & m1))" "$((i2 & m2))" "$((i3 & m3))" "$((i4 & m4))")
     network_address_to_ips $subnet_ip/$net_mask
     el_num=${#ips[@]}
-    #local i=$(nproc)
-    touch log.txt
-    for j in $(seq 1 $(nproc))
+    for x in $(seq 0 $(($(nproc)-2)))
     do
-        ping_thread $i &
+        ping_thread $x &
+        sleep 1
     done 
+    ping_thread $(($(nproc)-1))
+    cat 0.txt 1.txt 2.txt 3.txt >> log.txt
+    rm 0.txt
+    rm 1.txt
+    rm 2.txt
+    rm 3.txt
     return 0
 }
 
@@ -78,7 +82,6 @@ check_ports()
     done
     return 0
 }
-
 
 while getopts "i:" opt; do
   case $opt in
