@@ -1,0 +1,103 @@
+#!/bin/bash
+
+COUNT_FLAG=0
+STATE_FLAG=0
+PORT_FLAG=0
+#grep -A 4 -P Ethernet48 ifconfig.sample) | grep "RX packets." # TODO
+usage()
+{
+    echo "Please print in this way ifcShow -p param1,param2,param3... -c(optional) -s(optional)"
+    exit
+}
+
+display_table()
+{
+    ifaces=()
+    status=()
+    RX_s=()
+    TX_s=()
+    position=1
+    counter=1
+    ifaces_s=$(grep HW ifconfig.sample | awk -F " " '{ print $1 };')
+    status_s=$(grep LOWER_UP ip.sample | awk -F " " '{ print $3 }' | cut -d'>' -f 1 | rev | cut -c1-8 | rev)
+    RX_s=$(cat ifconfig.sample | grep "RX packets" | awk '{print $1$2}')
+    TX_s=$(cat ifconfig.sample | grep "TX packets" | awk '{print $1$2}')
+    if [ $COUNT_FLAG -eq 0 ]; then
+        RX_s=""
+        TX_s=""
+    fi
+    if [ $PORT_FLAG -eq 1 ]; then
+        ifaces=$(echo $interfaces | tr "," "\n")
+        for iface_s in ${ifaces_s[*]}
+        do
+            for iface in $ifaces
+            do
+                if [[ $iface_s != $iface ]]; then
+                    continue
+                fi
+                for item in $ifaces_s
+                do
+                    if [ "$item" == "$iface" ]; then
+                        break;
+                    else
+                        position=$(($position+1))
+                    fi
+                done
+                local RX=$(echo $RX_s | cut -d " " -f $position)
+                local TX=$(echo $TX_s | cut -d " " -f $position)
+                local state=$(echo $status_s | cut -d " " -f $position)
+                if [ "$state" != "LOWER_UP" ]; then
+                    state="DOWN"
+                fi
+                if [ $STATE_FLAG -eq 0 ]; then
+                    state=""
+                fi
+                printf "%20s %20s %20s %20s\n" "$iface" "$state" "$RX" "$TX"    
+                position=1
+            done
+        done
+    else
+        for iface in $ifaces_s
+        do
+            local RX=$(echo $RX_s | cut -d " " -f $counter)
+            local TX=$(echo $TX_s | cut -d " " -f $counter)
+            local state=$(echo $status_s | cut -d " " -f $counter)
+            if [ "$state" != "LOWER_UP" ]; then
+                state="DOWN"
+            fi
+            if [ $STATE_FLAG -eq 0 ]; then
+                state=""
+            fi
+            printf "%20s %20s %20s %20s\n" "$iface" "$state" "$RX" "$TX"
+            counter=$(($counter+1))
+        done
+    fi
+}
+
+while getopts ":p:cs" opt; do
+  case $opt in
+    p)
+        if [ $OPTARG == "-c" ] || [ $OPTARG == "-s" ] || [ $OPTARG == "" ]; then 
+           usage  
+        else
+            PORT_FLAG=1
+            interfaces=$OPTARG
+        fi
+     ;;
+    c)
+      COUNT_FLAG=1
+      ;;
+    s)
+      STATE_FLAG=1
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument.">&2
+      exit 1
+      ;;
+  esac
+done
+
+display_table

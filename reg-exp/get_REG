@@ -1,0 +1,36 @@
+#!/bin/bash
+
+FILE_TO_PARSE=$1 # here add a path to file which contain your parametrs.
+
+names=()
+
+parse()
+{
+    lines=($(grep "SXD" $FILE_TO_PARSE | awk '{print $1}')) # it will get all lines which starts with some pattern
+    for line in ${lines[@]} # and here we get all names what we need (btw "SXD_REG_ID_" and "_E")
+    do
+       names+=($(echo $line | sed -e 's/SXD_REG_ID_\(.*\)_E/\1/g'))
+    done
+}
+
+do_command()
+{
+    for command in ${names[@]}
+    do
+    grep "$command" /auto/sw_system_project/tools/aspell_exceptions/aspell_exceptions.txt
+    if [ $? -eq 0 ]; then
+        continue
+    else
+        Y "" | add_aspell_exception $command
+    fi
+    done
+}
+
+main()
+{
+    parse
+    do_command
+}
+
+main
+#IFS=$tmp
